@@ -44,7 +44,7 @@ def init_db():
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS goals (
                 id INTEGER PRIMARY KEY,
-                name TEXT,
+                name TEXT UNIQUE,
                 target_amount REAL,
                 current_amount REAL,
                 salary_percentage REAL
@@ -69,7 +69,7 @@ else:
         if not cursor.fetchone():
             init_db()
         else:
-            # Check if budgets table has the correct schema
+            # Check schema consistency
             cursor.execute("PRAGMA table_info(budgets)")
             columns = [info[1] for info in cursor.fetchall()]
             if 'budget_limit' not in columns:
@@ -82,8 +82,11 @@ else:
     finally:
         conn.close()
 
-# Functions to interact with DB
+# Funções DB
 def add_income(date, source, amount):
+    if amount <= 0:
+        st.error("O valor da renda deve ser maior que zero.")
+        return
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -96,6 +99,9 @@ def add_income(date, source, amount):
         conn.close()
 
 def add_expense(date, category, description, amount):
+    if not category or amount <= 0:
+        st.error("Informe uma categoria válida e valor maior que zero.")
+        return
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -108,6 +114,9 @@ def add_expense(date, category, description, amount):
         conn.close()
 
 def set_budget(category, budget_limit):
+    if not category or budget_limit <= 0:
+        st.error("Informe uma categoria válida e limite maior que zero.")
+        return
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -120,10 +129,13 @@ def set_budget(category, budget_limit):
         conn.close()
 
 def add_goal(name, target_amount, salary_percentage):
+    if not name or target_amount <= 0:
+        st.error("Informe um objetivo válido e valor alvo maior que zero.")
+        return
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO goals (name, target_amount, current_amount, salary_percentage) VALUES (?, ?, 0, ?)', (name, target_amount, salary_percentage))
+        cursor.execute('INSERT OR REPLACE INTO goals (name, target_amount, current_amount, salary_percentage) VALUES (?, ?, 0, ?)', (name, target_amount, salary_percentage))
         conn.commit()
         st.success("Objetivo adicionado!")
     except sqlite3.Error as e:
@@ -148,8 +160,7 @@ def get_total_income():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT SUM(amount) as total FROM incomes', conn)
         return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
-    except sqlite3.Error as e:
-        st.error(f"Erro ao obter renda total: {e}")
+    except sqlite3.Error:
         return 0.0
     finally:
         conn.close()
@@ -159,8 +170,7 @@ def get_total_expenses():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT SUM(amount) as total FROM expenses', conn)
         return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
-    except sqlite3.Error as e:
-        st.error(f"Erro ao obter despesas totais: {e}")
+    except sqlite3.Error:
         return 0.0
     finally:
         conn.close()
@@ -170,8 +180,7 @@ def get_expenses_by_category():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT category, SUM(amount) as total FROM expenses GROUP BY category', conn)
         return df
-    except sqlite3.Error as e:
-        st.error(f"Erro ao obter despesas por categoria: {e}")
+    except sqlite3.Error:
         return pd.DataFrame(columns=['category', 'total'])
     finally:
         conn.close()
@@ -181,8 +190,7 @@ def get_budgets():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT * FROM budgets', conn)
         return df.set_index('category')['budget_limit'].to_dict() if not df.empty else {}
-    except sqlite3.Error as e:
-        st.error(f"Erro ao obter orçamentos: {e}")
+    except sqlite3.Error:
         return {}
     finally:
         conn.close()
@@ -192,8 +200,7 @@ def get_goals():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT * FROM goals', conn)
         return df
-    except sqlite3.Error as e:
-        st.error(f"Erro ao obter objetivos: {e}")
+    except sqlite3.Error:
         return pd.DataFrame(columns=['name', 'target_amount', 'current_amount', 'salary_percentage'])
     finally:
         conn.close()
@@ -203,23 +210,22 @@ def get_existing_categories():
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT DISTINCT category FROM expenses', conn)
         return sorted(df['category'].tolist()) if not df.empty else []
-    except sqlite3.Error as e:
-        st.error(f"Erro ao obter categorias existentes: {e}")
+    except sqlite3.Error:
         return []
     finally:
         conn.close()
 
 def get_monthly_salary():
-    return get_total_income()  # Adjust if you need monthly filtering
+    return get_total_income()  # Ajustar se quiser filtrar por mês
 
 # Streamlit App
 st.set_page_config(page_title="Finanças Familiares", layout="wide", initial_sidebar_state="expanded")
 
-# Sidebar for navigation (mobile friendly)
+# Sidebar
 st.sidebar.title("Navegação")
 tabs = st.sidebar.radio("Seções", ["Dashboard", "Rendas", "Despesas", "Orçamentos", "Objetivos Financeiros"])
 
-# Dashboard Tab
+# Dashboard
 if tabs == "Dashboard":
     st.title("Dashboard Financeiro")
     
@@ -227,76 +233,42 @@ if tabs == "Dashboard":
     total_expenses = get_total_expenses()
     balance = total_income - total_expenses
     
-    # Card com Renda Total, Despesas e Saldo
     st.subheader("Visão Geral Financeira")
-    with st.container(border=True):
-        st.markdown(
-            """
-            <style>
-            .income-card {
-                background-color: #f0f2f6;
-                padding: 20px;
-                border-radius: 10px;
-                text-align: center;
-                margin-bottom: 20px;
-            }
-            .expense-bar {
-                color: #ff4b4b;
-                font-weight: bold;
-            }
-            .balance-positive {
-                background-color: #e6ffe6;
-                padding: 10px;
-                border-radius: 5px;
-                color: #2e7d32;
-                font-weight: bold;
-            }
-            .balance-negative {
-                background-color: #ffe6e6;
-                padding: 10px;
-                border-radius: 5px;
-                color: #d32f2f;
-                font-weight: bold;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            f'<div class="income-card"><h3>Renda Total: R$ {total_income:.2f}</h3></div>',
-            unsafe_allow_html=True
-        )
-        if total_income > 0:
-            expense_ratio = min(total_expenses / total_income, 1.0)  # Evita ultrapassar 100%
-            st.markdown('<p class="expense-bar">Despesas:</p>', unsafe_allow_html=True)
-            st.progress(expense_ratio, text=f"R$ {total_expenses:.2f} ({expense_ratio*100:.1f}%)")
-            balance_class = "balance-positive" if balance >= 0 else "balance-negative"
-            balance_text = f"Saldo Restante: R$ {balance:.2f} ({balance_ratio*100:.1f}%)" if balance >= 0 else f"Saldo Negativo: R$ {balance:.2f}"
-            balance_ratio = min(balance / total_income, 1.0) if balance >= 0 else 0.0
-            st.markdown(
-                f'<div class="{balance_class}">{balance_text}</div>',
-                unsafe_allow_html=True
-            )
+    if total_income > 0:
+        expense_ratio = min(total_expenses / total_income, 1.0)
+        balance_ratio = max(balance / total_income, 0.0)
+        
+        st.metric("Renda Total", f"R$ {total_income:.2f}")
+        st.metric("Despesas", f"R$ {total_expenses:.2f}")
+        st.progress(expense_ratio, text=f"Despesas: {expense_ratio*100:.1f}%")
+        
+        if balance >= 0:
+            st.success(f"Saldo Restante: R$ {balance:.2f} ({balance_ratio*100:.1f}%)")
         else:
-            st.info("Nenhuma renda registrada para exibir a barra de progresso.")
+            st.error(f"Saldo Negativo: R$ {balance:.2f}")
+    else:
+        st.info("Nenhuma renda registrada para exibir métricas.")
     
+    # Gráfico de despesas
     st.subheader("Despesas por Categoria")
     expenses_df = get_expenses_by_category()
     if not expenses_df.empty:
         fig = px.pie(expenses_df, values='total', names='category', title='Distribuição de Despesas por Categoria')
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Nenhuma despesa registrada para exibir no gráfico.")
+        st.info("Nenhuma despesa registrada.")
     
+    # Orçamentos
     st.subheader("Avisos de Orçamento")
     budgets = get_budgets()
-    if budgets:
+    if budgets and not expenses_df.empty:
         for category, total in expenses_df.set_index('category')['total'].items():
             if category in budgets and total > budgets[category]:
                 st.warning(f"Categoria '{category}' extrapolou o limite! Gasto: R$ {total:.2f} / Limite: R$ {budgets[category]:.2f}")
     else:
         st.info("Nenhum orçamento definido.")
     
+    # Objetivos
     st.subheader("Progresso dos Objetivos")
     goals_df = get_goals()
     if not goals_df.empty:
@@ -305,55 +277,43 @@ if tabs == "Dashboard":
             st.progress(progress / 100)
             st.write(f"{row['name']}: {progress:.2f}% (Atual: R$ {row['current_amount']:.2f} / Meta: R$ {row['target_amount']:.2f})")
     else:
-        st.info("Nenhum objetivo financeiro definido.")
+        st.info("Nenhum objetivo definido.")
 
-# Income Tab
+# Rendas
 elif tabs == "Rendas":
     st.title("Gerenciar Rendas")
-    
     with st.form("Adicionar Renda"):
         date = st.date_input("Data", datetime.date.today())
         source = st.text_input("Fonte (ex: Salário)")
         amount = st.number_input("Valor", min_value=0.0)
-        submit = st.form_submit_button("Adicionar")
-        if submit:
+        if st.form_submit_button("Adicionar"):
             add_income(str(date), source, amount)
 
-# Expenses Tab
+# Despesas
 elif tabs == "Despesas":
     st.title("Gerenciar Despesas")
-    
     with st.form("Adicionar Despesa"):
         date = st.date_input("Data", datetime.date.today())
         existing_categories = get_existing_categories()
-        category = st.selectbox("Categoria (ex: Alimentação)", options=existing_categories + ["Nova categoria"], index=len(existing_categories) if existing_categories else 0)
+        category = st.selectbox("Categoria", options=existing_categories + ["Nova categoria"])
         if category == "Nova categoria":
             category = st.text_input("Digite a nova categoria")
         description = st.text_input("Descrição")
         amount = st.number_input("Valor", min_value=0.0)
-        submit = st.form_submit_button("Adicionar")
-        if submit:
-            if category and category != "Nova categoria":
-                add_expense(str(date), category, description, amount)
-            else:
-                st.error("Por favor, insira uma categoria válida.")
+        if st.form_submit_button("Adicionar"):
+            add_expense(str(date), category, description, amount)
 
-# Budgets Tab
+# Orçamentos
 elif tabs == "Orçamentos":
     st.title("Definir Orçamentos")
-    
     with st.form("Definir Orçamento"):
         existing_categories = get_existing_categories()
-        category = st.selectbox("Categoria", options=existing_categories + ["Nova categoria"], index=len(existing_categories) if existing_categories else 0)
+        category = st.selectbox("Categoria", options=existing_categories + ["Nova categoria"])
         if category == "Nova categoria":
             category = st.text_input("Digite a nova categoria")
         budget_limit = st.number_input("Limite Mensal", min_value=0.0)
-        submit = st.form_submit_button("Salvar")
-        if submit:
-            if category and category != "Nova categoria":
-                set_budget(category, budget_limit)
-            else:
-                st.error("Por favor, insira uma categoria válida.")
+        if st.form_submit_button("Salvar"):
+            set_budget(category, budget_limit)
     
     st.subheader("Orçamentos Atuais")
     budgets = get_budgets()
@@ -363,20 +323,18 @@ elif tabs == "Orçamentos":
     else:
         st.info("Nenhum orçamento definido.")
 
-# Goals Tab
+# Objetivos
 elif tabs == "Objetivos Financeiros":
     st.title("Objetivos Financeiros")
-    
     monthly_salary = get_monthly_salary()
     
     with st.form("Adicionar Objetivo"):
-        name = st.text_input("Nome do Objetivo (ex: Viagem)")
+        name = st.text_input("Nome do Objetivo")
         target_amount = st.number_input("Valor Alvo", min_value=0.0)
         salary_percentage = st.slider("% do Salário para Guardar", 0, 100, 10) / 100.0
         monthly_saving = monthly_salary * salary_percentage
         st.info(f"Com {salary_percentage*100:.0f}% do salário, você guardaria R$ {monthly_saving:.2f} por mês.")
-        submit = st.form_submit_button("Adicionar")
-        if submit:
+        if st.form_submit_button("Adicionar"):
             add_goal(name, target_amount, salary_percentage)
     
     st.subheader("Atualizar Progresso")
@@ -388,4 +346,4 @@ elif tabs == "Objetivos Financeiros":
                 if st.button("Atualizar", key=row['name']):
                     update_goal_current(row['name'], current)
     else:
-        st.info("Nenhum objetivo financeiro definido.")
+        st.info("Nenhum objetivo definido.")
