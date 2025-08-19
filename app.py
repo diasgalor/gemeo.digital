@@ -227,10 +227,29 @@ if tabs == "Dashboard":
     total_expenses = get_total_expenses()
     balance = total_income - total_expenses
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Renda Total", f"R$ {total_income:.2f}")
-    col2.metric("Despesas Total", f"R$ {total_expenses:.2f}")
-    col3.metric("Saldo", f"R$ {balance:.2f}")
+    # Card com Renda Total, Despesas e Saldo
+    st.subheader("Visão Geral Financeira")
+    with st.container():
+        st.metric(label="Renda Total", value=f"R$ {total_income:.2f}")
+        if total_income > 0:
+            expense_ratio = min(total_expenses / total_income, 1.0)  # Evita ultrapassar 100%
+            st.write("Despesas (vermelho) sobre a renda total:")
+            st.progress(expense_ratio, text=f"Despesas: R$ {total_expenses:.2f} ({expense_ratio*100:.1f}%)")
+            if balance >= 0:
+                balance_ratio = min(balance / total_income, 1.0)
+                st.markdown(
+                    f'<div style="background-color: #e6ffe6; padding: 10px; border-radius: 5px;">'
+                    f'Saldo Restante: R$ {balance:.2f} ({balance_ratio*100:.1f}%)</div>',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f'<div style="background-color: #ffe6e6; padding: 10px; border-radius: 5px;">'
+                    f'Saldo Negativo: R$ {balance:.2f}</div>',
+                    unsafe_allow_html=True
+                )
+        else:
+            st.info("Nenhuma renda registrada para exibir a barra de progresso.")
     
     st.subheader("Despesas por Categoria")
     expenses_df = get_expenses_by_category()
