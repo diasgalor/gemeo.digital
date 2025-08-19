@@ -229,25 +229,54 @@ if tabs == "Dashboard":
     
     # Card com Renda Total, Despesas e Saldo
     st.subheader("Visão Geral Financeira")
-    with st.container():
-        st.metric(label="Renda Total", value=f"R$ {total_income:.2f}")
+    with st.container(border=True):
+        st.markdown(
+            """
+            <style>
+            .income-card {
+                background-color: #f0f2f6;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .expense-bar {
+                color: #ff4b4b;
+                font-weight: bold;
+            }
+            .balance-positive {
+                background-color: #e6ffe6;
+                padding: 10px;
+                border-radius: 5px;
+                color: #2e7d32;
+                font-weight: bold;
+            }
+            .balance-negative {
+                background-color: #ffe6e6;
+                padding: 10px;
+                border-radius: 5px;
+                color: #d32f2f;
+                font-weight: bold;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f'<div class="income-card"><h3>Renda Total: R$ {total_income:.2f}</h3></div>',
+            unsafe_allow_html=True
+        )
         if total_income > 0:
             expense_ratio = min(total_expenses / total_income, 1.0)  # Evita ultrapassar 100%
-            st.write("Despesas (vermelho) sobre a renda total:")
-            st.progress(expense_ratio, text=f"Despesas: R$ {total_expenses:.2f} ({expense_ratio*100:.1f}%)")
-            if balance >= 0:
-                balance_ratio = min(balance / total_income, 1.0)
-                st.markdown(
-                    f'<div style="background-color: #e6ffe6; padding: 10px; border-radius: 5px;">'
-                    f'Saldo Restante: R$ {balance:.2f} ({balance_ratio*100:.1f}%)</div>',
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f'<div style="background-color: #ffe6e6; padding: 10px; border-radius: 5px;">'
-                    f'Saldo Negativo: R$ {balance:.2f}</div>',
-                    unsafe_allow_html=True
-                )
+            st.markdown('<p class="expense-bar">Despesas:</p>', unsafe_allow_html=True)
+            st.progress(expense_ratio, text=f"R$ {total_expenses:.2f} ({expense_ratio*100:.1f}%)")
+            balance_class = "balance-positive" if balance >= 0 else "balance-negative"
+            balance_text = f"Saldo Restante: R$ {balance:.2f} ({balance_ratio*100:.1f}%)" if balance >= 0 else f"Saldo Negativo: R$ {balance:.2f}"
+            balance_ratio = min(balance / total_income, 1.0) if balance >= 0 else 0.0
+            st.markdown(
+                f'<div class="{balance_class}">{balance_text}</div>',
+                unsafe_allow_html=True
+            )
         else:
             st.info("Nenhuma renda registrada para exibir a barra de progresso.")
     
