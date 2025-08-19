@@ -37,7 +37,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS budgets (
                 id INTEGER PRIMARY KEY,
                 category TEXT UNIQUE,
-                limit REAL
+                budget_limit REAL
             )
         ''')
         
@@ -59,16 +59,23 @@ def init_db():
         conn.close()
 
 # Initialize DB
-if not os.path.exists(DB_FILE):
+if os.getenv("RESET_DB") == "true" or not os.path.exists(DB_FILE):
     init_db()
 else:
-    # Verify if tables exist, reinitialize if not
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'")
         if not cursor.fetchone():
             init_db()
+        else:
+            # Check if budgets table has the correct schema
+            cursor.execute("PRAGMA table_info(budgets)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'budget_limit' not in columns:
+                cursor.execute('DROP TABLE budgets')
+                conn.commit()
+                init_db()
     except sqlite3.Error as e:
         st.error(f"Erro ao verificar banco de dados: {e}")
         init_db()
@@ -100,11 +107,11 @@ def add_expense(date, category, description, amount):
     finally:
         conn.close()
 
-def set_budget(category, limit):
+def set_budget(category, budget_limit):
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute('INSERT OR REPLACE INTO budgets (category, limit) VALUES (?, ?)', (category, limit))
+        cursor.execute('INSERT OR REPLACE INTO budgets (category, budget_limit) VALUES (?, ?)', (category, budget_limit))
         conn.commit()
         st.success("Orçamento definido!")
     except sqlite3.Error as e:
@@ -173,7 +180,7 @@ def get_budgets():
     try:
         conn = sqlite3.connect(DB_FILE)
         df = pd.read_sql_query('SELECT * FROM budgets', conn)
-        return df.set_index('category')['limit'].to_dict() if not df.empty else {}
+        return df.set_index('category')['budget_limit'].to_dict() if not df.empty else {}
     except sqlite3.Error as e:
         st.error(f"Erro ao obter orçamentos: {e}")
         return {}
@@ -292,11 +299,11 @@ elif tabs == "Orçamentos":
         category = st.selectbox("Categoria", options=existing_categories + ["Nova categoria"], index=len(existing_categories) if existing_categories else 0)
         if category == "Nova categoria":
             category = st.text_input("Digite a nova categoria")
-        limit = st.number_input("Limite Mensal", min_value=0.0)
+        budget_limit = st.number_input("Limite Mensal", min_value=0.0)
         submit = st.form_submit_button("Salvar")
         if submit:
             if category and category != "Nova categoria":
-                set_budget(category, limit)
+                set_budget(category, budget_limit)
             else:
                 st.error("Por favor, insira uma categoria válida.")
     
