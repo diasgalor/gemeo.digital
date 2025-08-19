@@ -3,54 +3,59 @@ import pandas as pd
 import sqlite3
 import os
 import datetime
+import plotly.express as px
 
 # Database setup
 DB_FILE = 'finances.db'
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    # Create tables if they don't exist
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS incomes (
-            id INTEGER PRIMARY KEY,
-            date TEXT,
-            source TEXT,
-            amount REAL
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS expenses (
-            id INTEGER PRIMARY KEY,
-            date TEXT,
-            category TEXT,
-            description TEXT,
-            amount REAL
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS budgets (
-            id INTEGER PRIMARY KEY,
-            category TEXT UNIQUE,
-            limit REAL
-        )
-    ''')
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS goals (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            target_amount REAL,
-            current_amount REAL,
-            salary_percentage REAL
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # Create tables if they don't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS incomes (
+                id INTEGER PRIMARY KEY,
+                date TEXT,
+                source TEXT,
+                amount REAL
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY,
+                date TEXT,
+                category TEXT,
+                description TEXT,
+                amount REAL
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS budgets (
+                id INTEGER PRIMARY KEY,
+                category TEXT UNIQUE,
+                limit REAL
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS goals (
+                id INTEGER PRIMARY KEY,
+                name TEXT,
+                target_amount REAL,
+                current_amount REAL,
+                salary_percentage REAL
+            )
+        ''')
+        
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao inicializar o banco de dados: {e}")
+    finally:
+        conn.close()
 
 # Initialize DB
 if not os.path.exists(DB_FILE):
@@ -58,69 +63,125 @@ if not os.path.exists(DB_FILE):
 
 # Functions to interact with DB
 def add_income(date, source, amount):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO incomes (date, source, amount) VALUES (?, ?, ?)', (date, source, amount))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO incomes (date, source, amount) VALUES (?, ?, ?)', (date, source, amount))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao adicionar renda: {e}")
+    finally:
+        conn.close()
 
 def add_expense(date, category, description, amount):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO expenses (date, category, description, amount) VALUES (?, ?, ?, ?)', (date, category, description, amount))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO expenses (date, category, description, amount) VALUES (?, ?, ?, ?)', (date, category, description, amount))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao adicionar despesa: {e}")
+    finally:
+        conn.close()
 
 def set_budget(category, limit):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('INSERT OR REPLACE INTO budgets (category, limit) VALUES (?, ?)', (category, limit))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('INSERT OR REPLACE INTO budgets (category, limit) VALUES (?, ?)', (category, limit))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao definir orçamento: {e}")
+    finally:
+        conn.close()
 
 def add_goal(name, target_amount, salary_percentage):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO goals (name, target_amount, current_amount, salary_percentage) VALUES (?, ?, 0, ?)', (name, target_amount, salary_percentage))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO goals (name, target_amount, current_amount, salary_percentage) VALUES (?, ?, 0, ?)', (name, target_amount, salary_percentage))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao adicionar objetivo: {e}")
+    finally:
+        conn.close()
 
 def update_goal_current(name, current_amount):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute('UPDATE goals SET current_amount = ? WHERE name = ?', (current_amount, name))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE goals SET current_amount = ? WHERE name = ?', (current_amount, name))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao atualizar objetivo: {e}")
+    finally:
+        conn.close()
 
 def get_total_income():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query('SELECT SUM(amount) as total FROM incomes', conn)
-    conn.close()
-    return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        df = pd.read_sql_query('SELECT SUM(amount) as total FROM incomes', conn)
+        return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
+    except sqlite3.Error as e:
+        st.error(f"Erro ao obter renda total: {e}")
+        return 0.0
+    finally:
+        conn.close()
 
 def get_total_expenses():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query('SELECT SUM(amount) as total FROM expenses', conn)
-    conn.close()
-    return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        df = pd.read_sql_query('SELECT SUM(amount) as total FROM expenses', conn)
+        return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
+    except sqlite3.Error as e:
+        st.error(f"Erro ao obter despesas totais: {e}")
+        return 0.0
+    finally:
+        conn.close()
 
 def get_expenses_by_category():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query('SELECT category, SUM(amount) as total FROM expenses GROUP BY category', conn)
-    conn.close()
-    return df
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        df = pd.read_sql_query('SELECT category, SUM(amount) as total FROM expenses GROUP BY category', conn)
+        return df
+    except sqlite3.Error as e:
+        st.error(f"Erro ao obter despesas por categoria: {e}")
+        return pd.DataFrame(columns=['category', 'total'])
+    finally:
+        conn.close()
 
 def get_budgets():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query('SELECT * FROM budgets', conn)
-    conn.close()
-    return df.set_index('category')['limit'].to_dict() if not df.empty else {}
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        df = pd.read_sql_query('SELECT * FROM budgets', conn)
+        return df.set_index('category')['limit'].to_dict() if not df.empty else {}
+    except sqlite3.Error as e:
+        st.error(f"Erro ao obter orçamentos: {e}")
+        return {}
+    finally:
+        conn.close()
 
 def get_goals():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query('SELECT * FROM goals', conn)
-    conn.close()
-    return df
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        df = pd.read_sql_query('SELECT * FROM goals', conn)
+        return df
+    except sqlite3.Error as e:
+        st.error(f"Erro ao obter objetivos: {e}")
+        return pd.DataFrame(columns=['name', 'target_amount', 'current_amount', 'salary_percentage'])
+    finally:
+        conn.close()
+
+def get_existing_categories():
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        df = pd.read_sql_query('SELECT DISTINCT category FROM expenses', conn)
+        return sorted(df['category'].tolist()) if not df.empty else []
+    except sqlite3.Error as e:
+        st.error(f"Erro ao obter categorias existentes: {e}")
+        return []
+    finally:
+        conn.close()
 
 def get_monthly_salary():
     return get_total_income()  # Adjust if you need monthly filtering
@@ -148,13 +209,19 @@ if tabs == "Dashboard":
     st.subheader("Despesas por Categoria")
     expenses_df = get_expenses_by_category()
     if not expenses_df.empty:
-        st.bar_chart(expenses_df.set_index('category'))
+        fig = px.pie(expenses_df, values='total', names='category', title='Distribuição de Despesas por Categoria')
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Nenhuma despesa registrada para exibir no gráfico.")
     
     st.subheader("Avisos de Orçamento")
     budgets = get_budgets()
-    for category, total in expenses_df.set_index('category')['total'].items():
-        if category in budgets and total > budgets[category]:
-            st.warning(f"Categoria '{category}' extrapolou o limite! Gasto: R$ {total:.2f} / Limite: R$ {budgets[category]:.2f}")
+    if budgets:
+        for category, total in expenses_df.set_index('category')['total'].items():
+            if category in budgets and total > budgets[category]:
+                st.warning(f"Categoria '{category}' extrapolou o limite! Gasto: R$ {total:.2f} / Limite: R$ {budgets[category]:.2f}")
+    else:
+        st.info("Nenhum orçamento definido.")
     
     st.subheader("Progresso dos Objetivos")
     goals_df = get_goals()
@@ -163,6 +230,8 @@ if tabs == "Dashboard":
             progress = (row['current_amount'] / row['target_amount']) * 100 if row['target_amount'] > 0 else 0
             st.progress(progress / 100)
             st.write(f"{row['name']}: {progress:.2f}% (Atual: R$ {row['current_amount']:.2f} / Meta: R$ {row['target_amount']:.2f})")
+    else:
+        st.info("Nenhum objetivo financeiro definido.")
 
 # Income Tab
 elif tabs == "Rendas":
@@ -183,30 +252,45 @@ elif tabs == "Despesas":
     
     with st.form("Adicionar Despesa"):
         date = st.date_input("Data", datetime.date.today())
-        category = st.text_input("Categoria (ex: Alimentação)")
+        existing_categories = get_existing_categories()
+        category = st.selectbox("Categoria (ex: Alimentação)", options=existing_categories + ["Nova categoria"], index=len(existing_categories) if existing_categories else 0)
+        if category == "Nova categoria":
+            category = st.text_input("Digite a nova categoria")
         description = st.text_input("Descrição")
         amount = st.number_input("Valor", min_value=0.0)
         submit = st.form_submit_button("Adicionar")
         if submit:
-            add_expense(str(date), category, description, amount)
-            st.success("Despesa adicionada!")
+            if category and category != "Nova categoria":
+                add_expense(str(date), category, description, amount)
+                st.success("Despesa adicionada!")
+            else:
+                st.error("Por favor, insira uma categoria válida.")
 
 # Budgets Tab
 elif tabs == "Orçamentos":
     st.title("Definir Orçamentos")
     
     with st.form("Definir Orçamento"):
-        category = st.text_input("Categoria")
+        existing_categories = get_existing_categories()
+        category = st.selectbox("Categoria", options=existing_categories + ["Nova categoria"], index=len(existing_categories) if existing_categories else 0)
+        if category == "Nova categoria":
+            category = st.text_input("Digite a nova categoria")
         limit = st.number_input("Limite Mensal", min_value=0.0)
         submit = st.form_submit_button("Salvar")
         if submit:
-            set_budget(category, limit)
-            st.success("Orçamento definido!")
+            if category and category != "Nova categoria":
+                set_budget(category, limit)
+                st.success("Orçamento definido!")
+            else:
+                st.error("Por favor, insira uma categoria válida.")
     
     st.subheader("Orçamentos Atuais")
     budgets = get_budgets()
-    for cat, lim in budgets.items():
-        st.write(f"{cat}: R$ {lim:.2f}")
+    if budgets:
+        for cat, lim in budgets.items():
+            st.write(f"{cat}: R$ {lim:.2f}")
+    else:
+        st.info("Nenhum orçamento definido.")
 
 # Goals Tab
 elif tabs == "Objetivos Financeiros":
@@ -234,3 +318,5 @@ elif tabs == "Objetivos Financeiros":
                 if st.button("Atualizar", key=row['name']):
                     update_goal_current(row['name'], current)
                     st.success("Progresso atualizado!")
+    else:
+        st.info("Nenhum objetivo financeiro definido.")
