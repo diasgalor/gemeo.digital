@@ -52,6 +52,7 @@ def init_db():
         ''')
         
         conn.commit()
+        st.success("Banco de dados inicializado com sucesso!")
     except sqlite3.Error as e:
         st.error(f"Erro ao inicializar o banco de dados: {e}")
     finally:
@@ -60,6 +61,19 @@ def init_db():
 # Initialize DB
 if not os.path.exists(DB_FILE):
     init_db()
+else:
+    # Verify if tables exist, reinitialize if not
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='budgets'")
+        if not cursor.fetchone():
+            init_db()
+    except sqlite3.Error as e:
+        st.error(f"Erro ao verificar banco de dados: {e}")
+        init_db()
+    finally:
+        conn.close()
 
 # Functions to interact with DB
 def add_income(date, source, amount):
@@ -68,6 +82,7 @@ def add_income(date, source, amount):
         cursor = conn.cursor()
         cursor.execute('INSERT INTO incomes (date, source, amount) VALUES (?, ?, ?)', (date, source, amount))
         conn.commit()
+        st.success("Renda adicionada!")
     except sqlite3.Error as e:
         st.error(f"Erro ao adicionar renda: {e}")
     finally:
@@ -79,6 +94,7 @@ def add_expense(date, category, description, amount):
         cursor = conn.cursor()
         cursor.execute('INSERT INTO expenses (date, category, description, amount) VALUES (?, ?, ?, ?)', (date, category, description, amount))
         conn.commit()
+        st.success("Despesa adicionada!")
     except sqlite3.Error as e:
         st.error(f"Erro ao adicionar despesa: {e}")
     finally:
@@ -90,6 +106,7 @@ def set_budget(category, limit):
         cursor = conn.cursor()
         cursor.execute('INSERT OR REPLACE INTO budgets (category, limit) VALUES (?, ?)', (category, limit))
         conn.commit()
+        st.success("Orçamento definido!")
     except sqlite3.Error as e:
         st.error(f"Erro ao definir orçamento: {e}")
     finally:
@@ -101,6 +118,7 @@ def add_goal(name, target_amount, salary_percentage):
         cursor = conn.cursor()
         cursor.execute('INSERT INTO goals (name, target_amount, current_amount, salary_percentage) VALUES (?, ?, 0, ?)', (name, target_amount, salary_percentage))
         conn.commit()
+        st.success("Objetivo adicionado!")
     except sqlite3.Error as e:
         st.error(f"Erro ao adicionar objetivo: {e}")
     finally:
@@ -112,6 +130,7 @@ def update_goal_current(name, current_amount):
         cursor = conn.cursor()
         cursor.execute('UPDATE goals SET current_amount = ? WHERE name = ?', (current_amount, name))
         conn.commit()
+        st.success("Progresso atualizado!")
     except sqlite3.Error as e:
         st.error(f"Erro ao atualizar objetivo: {e}")
     finally:
@@ -244,7 +263,6 @@ elif tabs == "Rendas":
         submit = st.form_submit_button("Adicionar")
         if submit:
             add_income(str(date), source, amount)
-            st.success("Renda adicionada!")
 
 # Expenses Tab
 elif tabs == "Despesas":
@@ -262,7 +280,6 @@ elif tabs == "Despesas":
         if submit:
             if category and category != "Nova categoria":
                 add_expense(str(date), category, description, amount)
-                st.success("Despesa adicionada!")
             else:
                 st.error("Por favor, insira uma categoria válida.")
 
@@ -280,7 +297,6 @@ elif tabs == "Orçamentos":
         if submit:
             if category and category != "Nova categoria":
                 set_budget(category, limit)
-                st.success("Orçamento definido!")
             else:
                 st.error("Por favor, insira uma categoria válida.")
     
@@ -307,7 +323,6 @@ elif tabs == "Objetivos Financeiros":
         submit = st.form_submit_button("Adicionar")
         if submit:
             add_goal(name, target_amount, salary_percentage)
-            st.success("Objetivo adicionado!")
     
     st.subheader("Atualizar Progresso")
     goals_df = get_goals()
@@ -317,6 +332,5 @@ elif tabs == "Objetivos Financeiros":
                 current = st.number_input(f"Valor Atual para {row['name']}", value=float(row['current_amount']), min_value=0.0)
                 if st.button("Atualizar", key=row['name']):
                     update_goal_current(row['name'], current)
-                    st.success("Progresso atualizado!")
     else:
         st.info("Nenhum objetivo financeiro definido.")
