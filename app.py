@@ -96,13 +96,13 @@ def get_total_income():
     conn = sqlite3.connect(DB_FILE)
     df = pd.read_sql_query('SELECT SUM(amount) as total FROM incomes', conn)
     conn.close()
-    return df['total'][0] if not df.empty else 0
+    return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
 
 def get_total_expenses():
     conn = sqlite3.connect(DB_FILE)
     df = pd.read_sql_query('SELECT SUM(amount) as total FROM expenses', conn)
     conn.close()
-    return df['total'][0] if not df.empty else 0
+    return df['total'][0] if not df.empty and df['total'][0] is not None else 0.0
 
 def get_expenses_by_category():
     conn = sqlite3.connect(DB_FILE)
@@ -123,8 +123,7 @@ def get_goals():
     return df
 
 def get_monthly_salary():
-    # Assuming total income is monthly salary for simplicity; adjust as needed
-    return get_total_income()  # This could be filtered by month, but keeping simple
+    return get_total_income()  # Adjust if you need monthly filtering
 
 # Streamlit App
 st.set_page_config(page_title="Finanças Familiares", layout="wide", initial_sidebar_state="expanded")
