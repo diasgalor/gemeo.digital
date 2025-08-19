@@ -1,3 +1,6 @@
+supabase
+psycopg2-binary
+sqlalchemy
 streamlit
 pandas
 plotly
